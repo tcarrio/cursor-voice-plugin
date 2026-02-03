@@ -108,6 +108,22 @@ On agent stop, the hook:
 
 Config is written to `$XDG_CONFIG_HOME/voice-plugin-cursor/voice.local.md`.
 
+### Configuring voice
+
+These are the available voices as of this commit:
+
+- `alba`
+- `marius`
+- `javert`
+- `jean`
+- `fantine`
+- `cosette`
+- `eponine`
+- `azelma`
+
+The default is `azelma`. You can run the `/speak <voice>` command to update this setting.
+
+
 ### Custom prompts
 
 Examples:
