@@ -5,7 +5,7 @@
 # Blueprint passes { flake, inputs } (publisherArgs); we use flake for the plugin
 # source path. The inner attrset is the HM module; config/lib/pkgs come from
 # Home Manager when a consumer imports this module.
-{ flake, config, lib, pkgs, ... }:
+flake: { config, lib, pkgs, ... }:
 
 let
   cfg = config.cursor.voicePlugin;
