@@ -10,6 +10,8 @@
 let
   cfg = config.cursor.voicePlugin;
 
+  pkgsRef = pkgs ? unstable ? pkgs.unstable : pkgs;
+
   # Plugin source in store (exclude flake metadata and .git)
   pluginSrc = builtins.path {
     path = flake;
@@ -69,9 +71,9 @@ in
     '';
 
     home.packages = [
-      pkgs.pocket-tts
+      pkgsRef.pocket-tts
     ] ++ (lib.optionals cfg.ffmpeg [
-      pkgs.ffmpeg
+      pkgsRef.ffmpeg
     ]);
   };
 }
