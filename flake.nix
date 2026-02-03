@@ -3,19 +3,25 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }: 
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = nixpkgs.legacyPackages.${system};
-    in {
-      devShells.default = import ./nix/dev-shell.nix pkgs;
-    })
-    // {
-      homeManagerModules = {
-        voice-plugin-cursor = import ./nix/voice-plugin-cursor.nix self;
-        default = self.homeManagerModules.voice-plugin-cursor;
+  outputs = { self, ... } @ inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        inputs.home-manager.flakeModules.home-manager
+      ];
+
+      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+
+      perSystem = { system, ... }: {
+        devShells.default = import ./nix/dev-shell.nix inputs.nixpkgs.legacyPackages.${system};
       };
+
+      flake.homeManagerModules.default = self.homeManagerModules.voice-plugin-cursor;
     };
 }
