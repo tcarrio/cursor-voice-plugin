@@ -1,0 +1,17 @@
+{
+  "description": "Voice hooks - auto-generate voice summary when stopping",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'test -f \"${CLAUDE_PLUGIN_ROOT}/hooks/stop_hook.py\" && python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/stop_hook.py\" || echo \"{\\\"decision\\\":\\\"approve\\\"}\"'",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

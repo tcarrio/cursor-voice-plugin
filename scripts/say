@@ -1,0 +1,295 @@
+#!/usr/bin/env bash
+#
+# say - Text-to-speech using pocket-tts
+#
+# Usage: say [--voice <voice>] <text>
+# Example: say hello world
+# Example: say --voice azure "Hello, how are you?"
+#
+
+set -e
+
+# XDG Base Directory (state = persistent, runtime = session-scoped)
+VOICE_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/voice-plugin-cursor"
+if [[ -n "${XDG_RUNTIME_DIR}" ]]; then
+    VOICE_RUNTIME_DIR="${XDG_RUNTIME_DIR}/voice-plugin-cursor"
+else
+    VOICE_RUNTIME_DIR="${VOICE_STATE_DIR}/run"
+fi
+
+VOICE=""
+TEXT=""
+SESSION_ID=""
+TTS_HOST="${TTS_HOST:-localhost}"
+TTS_PORT="${TTS_PORT:-8000}"
+TTS_URL="http://${TTS_HOST}:${TTS_PORT}"
+TTS_LOG="${TTS_LOG:-$VOICE_STATE_DIR/pocket-tts.log}"
+TTS_PID_FILE="$VOICE_STATE_DIR/pocket-tts.pid"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --voice)
+            VOICE="$2"
+            shift 2
+            ;;
+        --session)
+            SESSION_ID="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: say [--voice <voice>] [--session <id>] <text>"
+            echo ""
+            echo "Options:"
+            echo "  --voice <voice>    Voice to use (e.g., alba, azure)"
+            echo "  --session <id>     Session ID for stop hook integration"
+            echo "  --help, -h         Show this help message"
+            echo ""
+            echo "Environment variables:"
+            echo "  TTS_HOST             TTS server host (default: localhost)"
+            echo "  TTS_PORT             TTS server port (default: 8000)"
+            echo "  TTS_SKIP_AUTO_START  If set, do not auto-start server; connect to existing only"
+            echo "  TTS_LOG               Log file when auto-starting server (default: \$XDG_STATE_HOME/voice-plugin-cursor/pocket-tts.log)"
+            echo "  XDG_STATE_HOME        Base dir for state (default: ~/.local/state); PID and log live under voice-plugin-cursor/"
+            echo "  XDG_RUNTIME_DIR       Base dir for runtime (session); playback lock and session flags live under voice-plugin-cursor/"
+            echo "  XDG_CONFIG_HOME       Base dir for config (default: ~/.config); voice.local.md lives under voice-plugin-cursor/"
+            echo ""
+            echo "Server: prefers globally installed 'pocket-tts'; falls back to 'uvx pocket-tts' if not in PATH."
+            exit 0
+            ;;
+        *)
+            TEXT="$TEXT $1"
+            shift
+            ;;
+    esac
+done
+
+# Trim leading space from text
+TEXT="${TEXT## }"
+
+if [[ -z "$TEXT" ]]; then
+    echo "Error: No text provided" >&2
+    exit 1
+fi
+
+# Config: XDG only
+VOICE_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/voice-plugin-cursor"
+CONFIG_FILE="$VOICE_CONFIG_DIR/voice.local.md"
+if [[ -f "$CONFIG_FILE" ]]; then
+    # Extract enabled status from YAML frontmatter
+    ENABLED=$(sed -n '/^---$/,/^---$/p' "$CONFIG_FILE" | grep "^enabled:" | sed 's/enabled:[[:space:]]*//')
+    # If explicitly disabled, exit silently
+    if [[ "$ENABLED" == "false" ]]; then
+        exit 0
+    fi
+    # Extract voice if not specified via --voice
+    if [[ -z "$VOICE" ]]; then
+        VOICE=$(sed -n '/^---$/,/^---$/p' "$CONFIG_FILE" | grep "^voice:" | sed 's/voice:[[:space:]]*//')
+    fi
+fi
+
+# Prefer globally installed pocket-tts; fall back to uvx
+if command -v pocket-tts > /dev/null 2>&1; then
+    TTS_SERVE_CMD="pocket-tts serve"
+else
+    TTS_SERVE_CMD="uvx pocket-tts serve"
+fi
+
+# Function to check if server is running
+check_server() {
+    curl -s -f "${TTS_URL}/health" > /dev/null 2>&1
+}
+
+# Function to start server (XDG state dir: log + PID file)
+start_server() {
+    mkdir -p "$VOICE_STATE_DIR"
+    echo "Starting pocket-tts server..." >&2
+    nohup $TTS_SERVE_CMD --host "$TTS_HOST" --port "$TTS_PORT" \
+        >> "$TTS_LOG" 2>&1 &
+    local server_pid=$!
+    echo "$server_pid" > "$TTS_PID_FILE"
+
+    # Wait for server to be ready (max 60 seconds)
+    local max_wait=60
+    local waited=0
+    while ! check_server; do
+        if [[ $waited -ge $max_wait ]]; then
+            echo "Error: Server failed to start within ${max_wait} seconds" >&2
+            echo "Check $TTS_LOG for details" >&2
+            rm -f "$TTS_PID_FILE"
+            exit 1
+        fi
+        sleep 1
+        waited=$((waited + 1))
+        if [[ $((waited % 5)) -eq 0 ]]; then
+            echo "Waiting for server to start... (${waited}s)" >&2
+        fi
+    done
+    echo "Server started! (PID $server_pid, PID file: $TTS_PID_FILE)" >&2
+}
+
+# Check if ffplay is available for streaming mode
+HAS_FFPLAY=false
+if command -v ffplay > /dev/null 2>&1; then
+    HAS_FFPLAY=true
+fi
+
+# Function to play audio from file (cross-platform fallback)
+play_audio_file() {
+    local file="$1"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        afplay "$file"
+    elif command -v aplay > /dev/null 2>&1; then
+        aplay -q "$file"
+    elif command -v paplay > /dev/null 2>&1; then
+        paplay "$file"
+    else
+        echo "Error: No audio player found (tried afplay, aplay, paplay)" >&2
+        exit 1
+    fi
+}
+
+# Function to play audio via streaming (lower latency)
+play_audio_stream() {
+    ffplay -nodisp -autoexit -loglevel quiet -i pipe:0
+}
+
+# Session state files (for stop hook integration; XDG runtime)
+mkdir -p "$VOICE_RUNTIME_DIR"
+if [[ -n "$SESSION_ID" ]]; then
+    SESSION_RUNNING="$VOICE_RUNTIME_DIR/voice-${SESSION_ID}-running"
+    SESSION_DONE="$VOICE_RUNTIME_DIR/voice-${SESSION_ID}-done"
+    SESSION_FAILED="$VOICE_RUNTIME_DIR/voice-${SESSION_ID}-failed"
+    echo $$ > "$SESSION_RUNNING"
+fi
+
+# Ensure server is running (unless user runs a shared server and skips auto-start)
+if ! check_server; then
+    if [[ -n "${TTS_SKIP_AUTO_START}" ]]; then
+        echo "Error: TTS server not reachable at ${TTS_URL}. Start it with: $TTS_SERVE_CMD --host ${TTS_HOST} --port ${TTS_PORT}" >&2
+        echo "Or unset TTS_SKIP_AUTO_START to let this script start it." >&2
+        exit 1
+    fi
+    start_server
+fi
+
+# Build base curl args
+CURL_ARGS=(-s -X POST "${TTS_URL}/tts" -F "text=${TEXT}")
+if [[ -n "$VOICE" ]]; then
+    CURL_ARGS+=(-F "voice_url=${VOICE}")
+fi
+
+# Queue audio playback using mkdir lock (XDG runtime)
+LOCK_DIR="$VOICE_RUNTIME_DIR/voice-playback.lockdir"
+LOCK_PID_FILE="$LOCK_DIR/pid"
+
+# Function to check if lock is stale (owner process is dead)
+is_lock_stale() {
+    if [[ ! -d "$LOCK_DIR" ]]; then
+        return 1  # No lock exists
+    fi
+    if [[ ! -f "$LOCK_PID_FILE" ]]; then
+        return 0  # Lock exists but no PID file = stale
+    fi
+    local lock_pid
+    lock_pid=$(cat "$LOCK_PID_FILE" 2>/dev/null)
+    if [[ -z "$lock_pid" ]]; then
+        return 0  # Empty PID file = stale
+    fi
+    # Check if process is still running
+    if ! kill -0 "$lock_pid" 2>/dev/null; then
+        return 0  # Process is dead = stale
+    fi
+    return 1  # Process is alive = not stale
+}
+
+# Function to clean up stale lock
+cleanup_stale_lock() {
+    rm -f "$LOCK_PID_FILE" 2>/dev/null
+    rmdir "$LOCK_DIR" 2>/dev/null
+}
+
+# Function to release our lock
+release_lock() {
+    rm -f "$LOCK_PID_FILE" 2>/dev/null
+    rmdir "$LOCK_DIR" 2>/dev/null
+}
+
+# Function to clean up session state on interrupt (not success, not failure)
+cleanup_on_interrupt() {
+    release_lock
+    # Remove running flag but don't create done/failed (indicates interrupt)
+    [[ -n "$SESSION_RUNNING" ]] && rm -f "$SESSION_RUNNING"
+}
+
+# Function to mark session as failed
+mark_failed() {
+    if [[ -n "$SESSION_ID" ]]; then
+        touch "$SESSION_FAILED"
+        rm -f "$SESSION_RUNNING"
+    fi
+}
+
+# Acquire lock with stale detection
+MAX_WAIT=30
+WAITED=0
+while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    if is_lock_stale; then
+        echo "Removing stale lock (owner process dead)" >&2
+        cleanup_stale_lock
+        continue
+    fi
+    sleep 0.2
+    WAITED=$((WAITED + 1))
+    if [[ $WAITED -ge $((MAX_WAIT * 5)) ]]; then  # 5 iterations per second
+        echo "Error: Timeout waiting for audio lock after ${MAX_WAIT}s" >&2
+        exit 1
+    fi
+done
+
+# Write our PID to the lock
+echo $$ > "$LOCK_PID_FILE"
+
+# Set trap to clean up on interrupt (INT/TERM signals)
+# Note: EXIT trap is set separately after successful completion
+trap cleanup_on_interrupt INT TERM
+
+if [[ "$HAS_FFPLAY" == "true" ]]; then
+    # Streaming mode: pipe directly to ffplay (lower latency)
+    if ! curl "${CURL_ARGS[@]}" | play_audio_stream; then
+        echo "Error: Failed to generate or play audio" >&2
+        mark_failed
+        release_lock
+        exit 1
+    fi
+else
+    # Fallback mode: write to temp file then play (XDG runtime/cache)
+    OUTPUT_FILE="$VOICE_RUNTIME_DIR/tts_output_$$.wav"
+    CURL_ARGS+=(-o "$OUTPUT_FILE")
+
+    if ! curl "${CURL_ARGS[@]}"; then
+        echo "Error: Failed to generate audio" >&2
+        mark_failed
+        release_lock
+        exit 1
+    fi
+
+    if [[ ! -s "$OUTPUT_FILE" ]]; then
+        echo "Error: Generated audio file is empty" >&2
+        mark_failed
+        release_lock
+        exit 1
+    fi
+
+    play_audio_file "$OUTPUT_FILE"
+    rm -f "$OUTPUT_FILE"
+fi
+
+# Release lock after successful playback
+release_lock
+
+# Mark session as done (for stop hook integration)
+if [[ -n "$SESSION_ID" ]]; then
+    touch "$SESSION_DONE"
+    rm -f "$SESSION_RUNNING"
+fi
