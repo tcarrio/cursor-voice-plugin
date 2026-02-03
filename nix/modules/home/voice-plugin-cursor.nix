@@ -1,14 +1,15 @@
 # Home Manager module: Cursor IDE voice plugin
 # Injects commands/skills into ~/.cursor/* and the plugin into XDG_DATA_HOME;
 # merges the stop hook into ~/.cursor/hooks.json.
-self: { config, lib, pkgs, ... }:
+# Blueprint calls this with (flake) so the plugin source is the flake root.
+flake: { config, lib, pkgs, ... }:
 
 let
   cfg = config.cursor.voicePlugin;
 
   # Plugin source in store (exclude flake metadata and .git)
   pluginSrc = builtins.path {
-    path = self;
+    path = flake;
     name = "voice-plugin-cursor";
     filter = path: type:
       let b = baseNameOf path;

@@ -1,11 +1,13 @@
-# Dev shell for voice-plugin-cursor: pocket-tts and ffmpeg in PATH.
+# Default devshell for voice-plugin-cursor: pocket-tts and ffmpeg in PATH.
 # pocket-tts is provided via uv (uvx) since it is not in nixpkgs.
-pkgs:
+# Blueprint passes { pkgs, perSystem, ... } (per-system args).
+{ pkgs, ... }:
+
 let
   pocketTtsWrapper = pkgs.writeShellScript "pocket-tts" ''
     exec ${pkgs.uv}/bin/uvx pocket-tts "$@"
   '';
-  devBin = pkgs.runCommand "voice-plugin-cursor-dev-bin" {} ''
+  devBin = pkgs.runCommand "voice-plugin-cursor-dev-bin" { } ''
     mkdir -p $out/bin
     ln -s ${pocketTtsWrapper} $out/bin/pocket-tts
   '';

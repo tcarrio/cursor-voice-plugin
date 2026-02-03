@@ -32,7 +32,7 @@ Restart Cursor so hooks and commands load.
 
 ### Installation via Nix (home-manager)
 
-The repo is a **Nix flake** that provides a **home-manager module** so you can enable the voice plugin declaratively. The module injects commands and skills into `~/.cursor/*`, installs the plugin into `$XDG_DATA_HOME/voice-plugin-cursor`, and merges the stop hook into `~/.cursor/hooks.json`.
+The repo is a **Nix flake** (using [Blueprint](https://github.com/numtide/blueprint) with `prefix = "nix/"`) that provides a **home-manager module** so you can enable the voice plugin declaratively. All Nix config lives under `nix/` (e.g. `nix/devshell.nix`, `nix/modules/home/`). The module injects commands and skills into `~/.cursor/*`, installs the plugin into `$XDG_DATA_HOME/voice-plugin-cursor`, and merges the stop hook into `~/.cursor/hooks.json`.
 
 **Add the flake and enable the module:**
 
