@@ -14,8 +14,8 @@
     })
     // {
       homeManagerModules = {
-        default = import ./nix/voice-plugin-cursor.nix self;
         voice-plugin-cursor = import ./nix/voice-plugin-cursor.nix self;
+        default = self.homeManagerModules.voice-plugin-cursor;
       };
     };
 }
