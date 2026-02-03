@@ -10,7 +10,7 @@
 let
   cfg = config.cursor.voicePlugin;
 
-  pkgsRef = pkgs ? unstable ? pkgs.unstable : pkgs;
+  pkgsRef = if pkgs ? unstable then pkgs.unstable else pkgs;
 
   # Plugin source in store (exclude flake metadata and .git)
   pluginSrc = builtins.path {
