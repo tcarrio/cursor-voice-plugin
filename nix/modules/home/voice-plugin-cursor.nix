@@ -2,17 +2,23 @@
 # Injects commands/skills into ~/.cursor/* and the plugin into XDG_DATA_HOME;
 # merges the stop hook into ~/.cursor/hooks.json.
 #
-# Blueprint passes { flake, inputs } (publisherArgs); we use flake for the plugin
-# source path. The inner attrset is the HM module; config/lib/pkgs come from
+# Scripts (stop hook, say, merge-hooks) come from the flake's voice-plugin-cursor
+# package, which wraps pocket-tts, ffmpeg, jq so the consumer's pkgs need not have them.
+#
+# Blueprint passes { flake, inputs } (publisherArgs). config/lib/pkgs come from
 # Home Manager when a consumer imports this module.
 { flake, ... }: { config, lib, pkgs, ... }:
 
 let
   cfg = config.cursor.voicePlugin;
+  system = pkgs.stdenv.hostPlatform.system;
+  # Pass module options into the package override so scripts use the chosen pocket-tts/ffmpeg
+  voicePluginPkg = (flake.packages.${system}.voice-plugin-cursor).override {
+    pocketTts = cfg.pocketTts.package;
+    ffmpeg = if cfg.ffmpeg.enable then cfg.ffmpeg.package else null;
+  };
 
-  pkgsRef = if pkgs ? unstable then pkgs.unstable else pkgs;
-
-  # Plugin source in store (exclude flake metadata and .git)
+  # Plugin source in store for XDG_DATA_HOME and .cursor (commands/skills)
   pluginSrc = builtins.path {
     path = flake;
     name = "voice-plugin-cursor";
@@ -24,37 +30,21 @@ let
   };
 
   hookEntry = {
-    command = "${pkgs.python315}/bin/python ${pluginSrc}/hooks/stop_hook_cursor.py";
+    command = "${voicePluginPkg}/bin/stop_hook_cursor";
     timeout = 60;
   };
   hookJson = builtins.toJSON hookEntry;
-
-  mergeHooksScript = pkgs.writeShellScript "merge-cursor-voice-hooks" ''
-    set -e
-    HOOK_JSON=${lib.escapeShellArg hookJson}
-    CURSOR_HOME="''${HOME}/.cursor"
-    mkdir -p "$CURSOR_HOME"
-    if [ ! -f "$CURSOR_HOME/hooks.json" ]; then
-      echo "{\"version\":1,\"hooks\":{\"stop\":[$HOOK_JSON]}}" > "$CURSOR_HOME/hooks.json"
-    else
-      if ${pkgs.jq}/bin/jq -e '.hooks.stop[]? | select(.command | contains("stop_hook_cursor"))' "$CURSOR_HOME/hooks.json" >/dev/null 2>&1; then
-        :
-      else
-        ${pkgs.jq}/bin/jq --argjson hook "$HOOK_JSON" '.hooks.stop += [$hook]' "$CURSOR_HOME/hooks.json" > "$CURSOR_HOME/hooks.json.tmp"
-        mv "$CURSOR_HOME/hooks.json.tmp" "$CURSOR_HOME/hooks.json"
-      fi
-    fi
-  '';
 in
 {
   options.cursor.voicePlugin = {
     enable = lib.mkEnableOption "Cursor IDE voice plugin (commands, skills, stop hook, plugin in XDG_DATA_HOME)";
 
-    pocket-tts = {
+    pocketTts = {
       package = lib.mkOption {
         type = lib.types.package;
-        default = flake.packages.${system}.voice-plugin-cursor;
-        description = "pocket-tts package";
+        default = pkgs.pocket-tts;
+        defaultText = lib.literalExpression "pkgs.pocket-tts";
+        description = "pocket-tts package used by the say script and stop hook (in runtime PATH)";
       };
     };
 
@@ -62,12 +52,13 @@ in
       enable = lib.mkOption {
         type = lib.types.bool;
         default = true;
-        description = "Install ffmpeg for local audio playback";
+        description = "Add ffmpeg to the plugin package runtime PATH (for say script streaming playback)";
       };
       package = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "The ffmpeg package to utilize";
+        type = lib.types.package;
+        default = pkgs.ffmpeg;
+        defaultText = lib.literalExpression "pkgs.ffmpeg";
+        description = "The ffmpeg package to use when ffmpeg.enable is true";
       };
     };
   };
@@ -80,15 +71,11 @@ in
     home.file.".cursor/commands/speak.md".source = "${pluginSrc}/.cursor/commands/speak.md";
     home.file.".cursor/skills/voice-update/SKILL.md".source = "${pluginSrc}/.cursor/skills/voice-update/SKILL.md";
 
-    # Merge stop hook into ~/.cursor/hooks.json (Cursor reads from ~/.cursor, not XDG config)
+    # Merge stop hook into ~/.cursor/hooks.json using the package's script (has jq)
     home.activation.mergeCursorVoiceHooks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      $DRY_RUN_CMD ${mergeHooksScript}
+      $DRY_RUN_CMD ${voicePluginPkg}/bin/merge-cursor-voice-hooks ${lib.escapeShellArg hookJson}
     '';
 
-    home.packages = [
-      pkgsRef.pocket-tts
-    ] ++ (lib.optionals cfg.ffmpeg [
-      pkgsRef.ffmpeg
-    ]);
+    home.packages = [ voicePluginPkg ];
   };
 }
