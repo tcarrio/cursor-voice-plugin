@@ -50,10 +50,25 @@ in
   options.cursor.voicePlugin = {
     enable = lib.mkEnableOption "Cursor IDE voice plugin (commands, skills, stop hook, plugin in XDG_DATA_HOME)";
 
-    ffmpeg = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Install ffmpeg for local audio playback";
+    pocket-tts = {
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = flake.packages.${system}.voice-plugin-cursor;
+        description = "pocket-tts package";
+      };
+    };
+
+    ffmpeg = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Install ffmpeg for local audio playback";
+      };
+      package = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "The ffmpeg package to utilize";
+      };
     };
   };
 
