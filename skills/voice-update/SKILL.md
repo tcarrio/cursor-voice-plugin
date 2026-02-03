@@ -51,4 +51,4 @@ ${CLAUDE_PLUGIN_ROOT}/scripts/say --voice azure "Task completed successfully."
 ## Notes
 
 - The say script auto-starts the pocket-tts server if not running (first use may take ~30-60s)
-- Requires `uvx` and `afplay` (macOS) or `aplay` (Linux)
+- Requires `pocket-tts` or `uvx` along with `afplay` (macOS) or `aplay` (Linux).
