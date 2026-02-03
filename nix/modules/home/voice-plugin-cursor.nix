@@ -1,8 +1,11 @@
 # Home Manager module: Cursor IDE voice plugin
 # Injects commands/skills into ~/.cursor/* and the plugin into XDG_DATA_HOME;
 # merges the stop hook into ~/.cursor/hooks.json.
-# Blueprint calls this with (flake) so the plugin source is the flake root.
-flake: { config, lib, pkgs, ... }:
+#
+# Blueprint passes { flake, inputs } (publisherArgs); we use flake for the plugin
+# source path. The inner attrset is the HM module; config/lib/pkgs come from
+# Home Manager when a consumer imports this module.
+{ flake, config, lib, pkgs, ... }:
 
 let
   cfg = config.cursor.voicePlugin;
@@ -19,7 +22,7 @@ let
   };
 
   hookEntry = {
-    command = "python3 ${pluginSrc}/hooks/stop_hook_cursor.py";
+    command = "${pkgs.python315}/bin/python ${pluginSrc}/hooks/stop_hook_cursor.py";
     timeout = 60;
   };
   hookJson = builtins.toJSON hookEntry;
@@ -48,7 +51,7 @@ in
     ffmpeg = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Install ffmpeg";
+      description = "Install ffmpeg for local audio playback";
     };
   };
 
