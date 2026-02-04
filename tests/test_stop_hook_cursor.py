@@ -13,7 +13,7 @@ if str(_ROOT) not in sys.path:
 
 from hooks.stop_hook_cursor import (
     _extract_text_from_content,
-    get_last_assistant_from_transcript,
+    get_last_assistant_from_transcript_jsonl,
 )
 
 # Test data colocated with tests (Python convention: fixtures under test package)
@@ -54,11 +54,11 @@ class TestExtractTextFromContent(unittest.TestCase):
 
 
 class TestGetLastAssistantFromTranscript(unittest.TestCase):
-    """Tests for get_last_assistant_from_transcript using example JSONL."""
+    """Tests for get_last_assistant_from_transcript_jsonl using example JSONL."""
 
     def test_example_file_returns_last_assistant_message(self):
         """Parse tests/data/transcript.example.jsonl; last line is assistant with summary."""
-        result = get_last_assistant_from_transcript(EXAMPLE_TRANSCRIPT)
+        result = get_last_assistant_from_transcript_jsonl(EXAMPLE_TRANSCRIPT)
         self.assertIsNotNone(result)
         # Last message in example is the "Summary of changes" block
         self.assertIn("Summary of changes", result)
@@ -67,7 +67,7 @@ class TestGetLastAssistantFromTranscript(unittest.TestCase):
 
     def test_example_file_returns_only_last_assistant_not_earlier(self):
         """Parser works from end of file; we get the final assistant message."""
-        result = get_last_assistant_from_transcript(EXAMPLE_TRANSCRIPT)
+        result = get_last_assistant_from_transcript_jsonl(EXAMPLE_TRANSCRIPT)
         self.assertIsNotNone(result)
         # Earliest assistant in example has "The user wants to fix the TTS output"
         # Last assistant has "Summary of changes" and "Removed Markdown heuristics"
@@ -75,11 +75,11 @@ class TestGetLastAssistantFromTranscript(unittest.TestCase):
         self.assertIn("Removed debug write", result)
 
     def test_nonexistent_path_returns_none(self):
-        result = get_last_assistant_from_transcript(_TESTS_DIR / "nonexistent.jsonl")
+        result = get_last_assistant_from_transcript_jsonl(_TESTS_DIR / "nonexistent.jsonl")
         self.assertIsNone(result)
 
     def test_directory_path_returns_none(self):
-        result = get_last_assistant_from_transcript(_TESTS_DIR)
+        result = get_last_assistant_from_transcript_jsonl(_TESTS_DIR)
         self.assertIsNone(result)
 
     def test_empty_file_returns_none(self):
@@ -90,7 +90,7 @@ class TestGetLastAssistantFromTranscript(unittest.TestCase):
             ) as f:
                 pass
             try:
-                result = get_last_assistant_from_transcript(Path(f.name))
+                result = get_last_assistant_from_transcript_jsonl(Path(f.name))
                 self.assertIsNone(result)
             finally:
                 Path(f.name).unlink(missing_ok=True)
@@ -102,7 +102,7 @@ class TestGetLastAssistantFromTranscript(unittest.TestCase):
         ) as f:
             f.write('{"role":"user","message":{"content":[{"type":"text","text":"Hi"}]}}\n')
         try:
-            result = get_last_assistant_from_transcript(Path(f.name))
+            result = get_last_assistant_from_transcript_jsonl(Path(f.name))
             self.assertIsNone(result)
         finally:
             Path(f.name).unlink(missing_ok=True)
@@ -114,7 +114,7 @@ class TestGetLastAssistantFromTranscript(unittest.TestCase):
         ) as f:
             f.write('{"role":"assistant","message":{"content":[{"type":"text","text":"Done."}]}}\n')
         try:
-            result = get_last_assistant_from_transcript(Path(f.name))
+            result = get_last_assistant_from_transcript_jsonl(Path(f.name))
             self.assertEqual(result, "Done.")
         finally:
             Path(f.name).unlink(missing_ok=True)

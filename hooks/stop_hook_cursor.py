@@ -134,7 +134,7 @@ def _get_last_assistant_from_transcript_markdown(transcript_path: Path) -> str |
     return None
 
 
-def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
+def get_last_assistant_from_transcript_jsonl(transcript_path: Path) -> str | None:
     """
     Extract the last assistant message from a Cursor transcript file.
     Tries JSONL first (one JSON object per line with role, message.content[].type/text),
@@ -287,7 +287,7 @@ def main() -> None:
     transcript_path = Path(transcript_path_raw) if transcript_path_raw else None
     last_message = None
     if transcript_path:
-        last_message = get_last_assistant_from_transcript(transcript_path)
+        last_message = get_last_assistant_from_transcript_jsonl(transcript_path)
 
     if not last_message:
         print("{}")
