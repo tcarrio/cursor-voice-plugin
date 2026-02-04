@@ -49,12 +49,11 @@ let
       if [ ! -f "$CURSOR_HOME/hooks.json" ]; then
         echo "{\"version\":1,\"hooks\":{\"stop\":[$HOOK_JSON]}}" > "$CURSOR_HOME/hooks.json"
       else
-        if jq -e '.hooks.stop[]? | select(.command | contains("stop_hook_cursor"))' "$CURSOR_HOME/hooks.json" >/dev/null 2>&1; then
-          :
-        else
-          jq --argjson hook "$HOOK_JSON" '.hooks.stop += [$hook]' "$CURSOR_HOME/hooks.json" > "$CURSOR_HOME/hooks.json.tmp"
-          mv "$CURSOR_HOME/hooks.json.tmp" "$CURSOR_HOME/hooks.json"
-        fi
+        # Replace any existing stop_hook_cursor entry with ours so the store path is current
+        jq --argjson hook "$HOOK_JSON" '
+          .hooks.stop = ((.hooks.stop // []) | map(select(.command | contains("voice-plugin-cursor/hooks/stop_hook_cursor.py") | not)) + [$hook])
+        ' "$CURSOR_HOME/hooks.json" > "$CURSOR_HOME/hooks.json.tmp"
+        mv "$CURSOR_HOME/hooks.json.tmp" "$CURSOR_HOME/hooks.json"
       fi
     '';
 
