@@ -24,6 +24,8 @@ Run from repo root.
 | Build the voice-plugin-cursor package | `nix build .#packages.$(nix eval --raw .#currentSystem).voice-plugin-cursor` or `nix build .#voice-plugin-cursor` if your flake exposes that app/package name |
 | Enter dev shell (pocket-tts, ffmpeg, etc. in PATH) | `nix develop` |
 | Run test suite (Python unittest) as part of flake checks | `nix flake check` |
+| See unittest output when building the test check | `nix build '.#checks.<system>.pkgs-voice-plugin-cursor-voice-plugin-cursor-tests' --print-build-logs`; or after building, `cat result/test-output.log` |
+| Force rebuild so test output is shown (if last run was cached) | Same as above but add `--rebuild`: `nix build '.#checks.<system>.pkgs-voice-plugin-cursor-voice-plugin-cursor-tests' --rebuild --print-build-logs` |
 | List flake outputs (see exact attribute names) | `nix flake show` |
 
 Consumers use the module by importing `inputs.voice-plugin-cursor.homeManagerModules.default` and setting `cursor.voicePlugin.enable = true`; then `home-manager switch --flake .` (or their usual home-manager command).
