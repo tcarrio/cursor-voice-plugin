@@ -17,7 +17,7 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
     mkdir -p "$VOICE_CONFIG_DIR"
     cat > "$CONFIG_FILE" << 'CONFIGEOF'
 ---
-voice: azelma
+voice: eponine
 enabled: true
 ---
 

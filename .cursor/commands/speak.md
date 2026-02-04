@@ -16,7 +16,7 @@ Enable, disable, or configure voice feedback (post-completion audible summaries)
 
 ```yaml
 ---
-voice: azelma
+voice: eponine
 enabled: true
 prompt: "always end with 'peace out'"
 ---
@@ -34,4 +34,4 @@ prompt: "always end with 'peace out'"
 - When `prompt` (no text): Clear the prompt field, tell user:
   "Custom prompt cleared."
 
-Create the config file if it doesn't exist (default voice: azelma) at `$XDG_CONFIG_HOME/voice-plugin-cursor/voice.local.md` (create the directory if needed).
+Create the config file if it doesn't exist (default voice: eponine) at `$XDG_CONFIG_HOME/voice-plugin-cursor/voice.local.md` (create the directory if needed).

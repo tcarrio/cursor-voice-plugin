@@ -40,7 +40,7 @@ def get_voice_config() -> tuple[bool, str, str]:
     if not config_file.exists():
         config_file.parent.mkdir(parents=True, exist_ok=True)
         config_file.write_text("""---
-voice: azelma
+voice: eponine
 enabled: true
 ---
 
@@ -48,12 +48,12 @@ enabled: true
 
 Use `/speak stop` to disable, `/speak <name>` to change voice.
 """, encoding="utf-8")
-        return True, "azelma", ""
+        return True, "eponine", ""
 
     content = config_file.read_text(encoding="utf-8")
 
     enabled = True
-    voice = "azelma"
+    voice = "eponine"
     custom_prompt = ""
 
     lines = content.split("\n")

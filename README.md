@@ -118,10 +118,10 @@ These are the available voices as of this commit:
 - `jean`
 - `fantine`
 - `cosette`
-- `eponine`
+- `eponine` *
 - `azelma`
 
-The default is `azelma`. You can run the `/speak <voice>` command to update this setting.
+The default is `eponine`. You can run the `/speak <voice>` command to update this setting.
 
 
 ### Custom prompts
