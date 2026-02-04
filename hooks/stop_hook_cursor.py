@@ -91,6 +91,12 @@ def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
         return None
     try:
         text = transcript_path.read_text(encoding="utf-8", errors="replace")
+        Path("/Users/tcarrio/Code/voice-plugin-cursor/transcript.md").write_text(
+            transcript_path.name +
+            "\n--------------------------------\n" +
+            text,
+            encoding="utf-8"
+        )
     except Exception:
         return None
 
