@@ -23,6 +23,7 @@ Run from repo root.
 | Same (if using blueprint’s homeModules directly) | `nix eval .#homeModules.voice-plugin-cursor` |
 | Build the voice-plugin-cursor package | `nix build .#packages.$(nix eval --raw .#currentSystem).voice-plugin-cursor` or `nix build .#voice-plugin-cursor` if your flake exposes that app/package name |
 | Enter dev shell (pocket-tts, ffmpeg, etc. in PATH) | `nix develop` |
+| Run test suite (Python unittest) as part of flake checks | `nix flake check` |
 | List flake outputs (see exact attribute names) | `nix flake show` |
 
 Consumers use the module by importing `inputs.voice-plugin-cursor.homeManagerModules.default` and setting `cursor.voicePlugin.enable = true`; then `home-manager switch --flake .` (or their usual home-manager command).
