@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+import tempfile
 
 # Plugin root (e.g. XDG_DATA_HOME/voice-plugin-cursor)
 HOOKS_DIR = Path(__file__).resolve().parent
@@ -160,17 +161,19 @@ def summarize_with_claude(
     prompt = f"YOUR LAST MESSAGE:\n{last_message}\n\n---\n{base_instruction}"
 
     try:
+        temp_dir = tempfile.mkdtemp()
         result = subprocess.run(
             [
-                "claude", "-p",
+                "cursor-agent",
+                "--print",
                 "--output-format", "json",
-                "--no-session-persistence",
-                "--setting-sources", "",
+                "--model", "sonnet-4.5",
                 prompt,
             ],
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=temp_dir.name,
         )
         if result.returncode == 0:
             data = json.loads(result.stdout)
