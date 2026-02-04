@@ -57,8 +57,21 @@ let
       fi
     '';
 
+    # Source for Python unittest suite (full flake so hooks/ and tests/ are present)
+    pythonTests = pkgs.runCommand "voice-plugin-cursor-tests" {
+      nativeBuildInputs = [ pkgs.python3 ];
+      src = flake;
+    } ''
+      mkdir -p build && cd build
+      cp -r $src/hooks $src/tests .
+      export PYTHONPATH=$PWD
+      ${pkgs.python3}/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+      touch $out
+    '';
+
   in
   pkgs.runCommand "voice-plugin-cursor-${pkgs.python3.version}" {
+    passthru = { tests = { voice-plugin-cursor-tests = pythonTests; }; };
     meta = {
       description = "Cursor voice plugin - wrapped stop hook and say script with pocket-tts";
       mainProgram = "stop_hook_cursor";
