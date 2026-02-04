@@ -134,7 +134,7 @@ def trim_to_words(text: str, max_words: int) -> str:
 
     # If we have more than max_words, we want to keep the most recent words
     # of the message.
-    return "..." + " ".join(words[(len(words) - max_words):])
+    return "..." + " ".join(words[:max_words])
 
 
 def summarize_with_claude(
@@ -145,9 +145,9 @@ def summarize_with_claude(
     if not last_message:
         return None
 
-    last_message = trim_to_words(last_message.strip(), 500)
-    if len(last_message) > 3000:
-        last_message = last_message[:3000] + "..."
+    last_message = trim_to_words(last_message.strip(), 300)
+    if len(last_message) > 2000:
+        last_message = last_message[:2000] + "..."
 
     base_instruction = (
         "You are the assistant who just wrote that message. Give a brief SPOKEN voice update to the user. "
