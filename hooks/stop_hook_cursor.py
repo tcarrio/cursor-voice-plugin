@@ -130,7 +130,10 @@ def trim_to_words(text: str, max_words: int) -> str:
     words = text.split()
     if len(words) <= max_words:
         return text
-    return " ".join(words[:max_words]) + "..."
+
+    # If we have more than max_words, we want to keep the most recent words
+    # of the message.
+    return "..." + " ".join(words[(len(words) - max_words):])
 
 
 def summarize_with_claude(
