@@ -13,7 +13,6 @@ Uses XDG_CONFIG_HOME/voice-plugin-cursor/voice.local.md for config only.
 
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -83,45 +82,53 @@ Use `/speak stop` to disable, `/speak <name>` to change voice.
     return enabled, voice, custom_prompt
 
 
+def _extract_text_from_content(content: list) -> str:
+    """From message.content (list of {type, text} items), return concatenated text."""
+    if not content:
+        return ""
+    parts = []
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "text" and "text" in item:
+            parts.append(item["text"])
+    return "\n".join(parts)
+
+
 def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
     """
     Extract the last assistant message from a Cursor transcript file.
-    Handles plain text, markdown (## Assistant / ## User), or similar patterns.
+    Expects JSONL: one JSON object per line with role, message.content[].type/text.
+    Reads from the end of the file and returns on the first (i.e. last) assistant line.
     """
     if not transcript_path.is_file():
         return None
     try:
-        text = transcript_path.read_text(encoding="utf-8", errors="replace")
-        Path("/Users/tcarrio/Code/voice-plugin-cursor/transcript.md").write_text(
-            transcript_path.name +
-            "\n--------------------------------\n" +
-            text,
-            encoding="utf-8"
-        )
+        lines = transcript_path.read_text(encoding="utf-8", errors="replace").splitlines()
     except Exception:
         return None
 
-    if not text.strip():
-        return None
-
-    # Try markdown-style sections (## Assistant / ## User / ## Human)
-    sections = re.split(r"\n(?=##\s+)", text)
-    for block in reversed(sections):
-        if re.match(r"^##\s+(Assistant|assistant)\s*\n", block, re.IGNORECASE):
-            body = re.sub(r"^##\s+\w+\s*\n", "", block).strip()
-            if body:
-                return body
-
-    # Try "Assistant:" or "assistant:" line prefix
-    for line in reversed(text.split("\n")):
-        m = re.match(r"^(?:Assistant|assistant):\s*(.+)$", line, re.IGNORECASE)
-        if m:
-            return m.group(1).strip()
-
-    # Fallback: last non-empty paragraph (often the last message is assistant)
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    if paragraphs:
-        return paragraphs[-1]
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("role") != "assistant":
+            continue
+        message = obj.get("message")
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        text = _extract_text_from_content(content)
+        if text:
+            return text
 
     return None
 
