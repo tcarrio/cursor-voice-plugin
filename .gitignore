@@ -1,1 +1,8 @@
+# Direnv setup
 .direnv/
+
+# Python artifacts
+__pycache__/
+
+# Data artifacts to be ignored
+/data
