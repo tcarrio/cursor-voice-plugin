@@ -13,6 +13,7 @@ Uses XDG_CONFIG_HOME/voice-plugin-cursor/voice.local.md for config only.
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -95,11 +96,49 @@ def _extract_text_from_content(content: list) -> str:
     return "\n".join(parts)
 
 
+def _get_last_assistant_from_transcript_markdown(transcript_path: Path) -> str | None:
+    """
+    Extract the last assistant message using Markdown-style parsing.
+    Handles plain text, markdown (## Assistant / ## User), or similar patterns.
+    Future: make transcript format (jsonl vs markdown) configurable in voice.local.md.
+    """
+    if not transcript_path.is_file():
+        return None
+    try:
+        text = transcript_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return None
+
+    if not text.strip():
+        return None
+
+    # Try markdown-style sections (## Assistant / ## User / ## Human)
+    sections = re.split(r"\n(?=##\s+)", text)
+    for block in reversed(sections):
+        if re.match(r"^##\s+(Assistant|assistant)\s*\n", block, re.IGNORECASE):
+            body = re.sub(r"^##\s+\w+\s*\n", "", block).strip()
+            if body:
+                return body
+
+    # Try "Assistant:" or "assistant:" line prefix
+    for line in reversed(text.split("\n")):
+        m = re.match(r"^(?:Assistant|assistant):\s*(.+)$", line, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+
+    # Fallback: last non-empty paragraph (often the last message is assistant)
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    if paragraphs:
+        return paragraphs[-1]
+
+    return None
+
+
 def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
     """
     Extract the last assistant message from a Cursor transcript file.
-    Expects JSONL: one JSON object per line with role, message.content[].type/text.
-    Reads from the end of the file and returns on the first (i.e. last) assistant line.
+    Tries JSONL first (one JSON object per line with role, message.content[].type/text),
+    then falls back to Markdown-style parsing.
     """
     if not transcript_path.is_file():
         return None
@@ -108,6 +147,8 @@ def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
     except Exception:
         return None
 
+    # Default: JSONL parser
+    saw_jsonl_line = False
     for line in reversed(lines):
         line = line.strip()
         if not line:
@@ -118,6 +159,8 @@ def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
             continue
         if not isinstance(obj, dict):
             continue
+        if "role" in obj:
+            saw_jsonl_line = True
         if obj.get("role") != "assistant":
             continue
         message = obj.get("message")
@@ -130,7 +173,11 @@ def get_last_assistant_from_transcript(transcript_path: Path) -> str | None:
         if text:
             return text
 
-    return None
+    # If file looks like JSONL (we saw at least one role-bearing line), don't fall back
+    if saw_jsonl_line:
+        return None
+    # Fallback: Markdown-style transcript
+    return _get_last_assistant_from_transcript_markdown(transcript_path)
 
 
 def trim_to_words(text: str, max_words: int) -> str:
