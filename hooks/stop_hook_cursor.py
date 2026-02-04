@@ -151,14 +151,14 @@ def summarize_with_claude(
 
     base_instruction = (
         "You are the assistant who just wrote that message. Give a brief SPOKEN voice update to the user. "
-        "Match the user's tone. Keep it to 1-2 sentences max. "
+        "Match the user's tone. Keep it to 1-2 sentences max and MUST be under 100 words."
         "Since this will be spoken aloud, avoid file paths, UUIDs, hashes - use natural language."
         " What would you say?"
     )
     if custom_prompt:
         base_instruction += f"\n\nAdditional instruction: {custom_prompt}"
 
-    prompt = f"YOUR LAST MESSAGE:\n{last_message}\n\n---\n{base_instruction}"
+    prompt = f"<YOUR-LAST-MESSAGE>\n{last_message}\n\n</YOUR-LAST-MESSAGE>\n\n---\n\n{base_instruction}"
 
     try:
         temp_dir = tempfile.mkdtemp()
