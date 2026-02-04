@@ -62,11 +62,11 @@ let
       nativeBuildInputs = [ pkgs.python3 ];
       src = flake;
     } ''
-      mkdir -p build && cd build
+      mkdir -p build $out && cd build
       cp -r $src/hooks $src/tests .
       export PYTHONPATH=$PWD
-      ${pkgs.python3}/bin/python -m unittest discover -s tests -p 'test_*.py' -v
-      touch $out
+      export PYTHONUNBUFFERED=1
+      ${pkgs.python3}/bin/python -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee $out/test-output.log
     '';
 
   in
