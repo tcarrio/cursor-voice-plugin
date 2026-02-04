@@ -2,6 +2,7 @@
 Unit tests for the Cursor stop hook transcript parser.
 Uses test data in tests/data/ (Cursor JSONL format) to validate behavior.
 """
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -64,6 +65,24 @@ class TestGetLastAssistantFromTranscript(unittest.TestCase):
         self.assertIn("Summary of changes", result)
         self.assertIn("JSONL parsing", result)
         self.assertIn("Result: the hook uses", result)
+
+    def test_example_file_extracts_exactly_last_line(self):
+        """Extracting from tests/data/transcript.example.jsonl returns the last line's text only."""
+        # Get the last non-empty line from the example file and extract its text the same way the hook does
+        lines = [
+            ln.strip()
+            for ln in EXAMPLE_TRANSCRIPT.read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        ]
+        self.assertGreater(len(lines), 1, "example file should have multiple lines")
+        last_line = lines[-1]
+        obj = json.loads(last_line)
+        expected = _extract_text_from_content(
+            obj.get("message", {}).get("content") or []
+        )
+        self.assertTrue(expected, "last line should have extractable assistant text")
+        result = get_last_assistant_from_transcript_jsonl(EXAMPLE_TRANSCRIPT)
+        self.assertEqual(result, expected, "should return exactly the last line's extracted text")
 
     def test_example_file_returns_only_last_assistant_not_earlier(self):
         """Parser works from end of file; we get the final assistant message."""
